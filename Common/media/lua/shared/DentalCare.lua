@@ -18,21 +18,21 @@ function DentalCare.performBrushTeeth(player, toothpaste) -- Trocamos 'sinkObjec
 end
 
 ------------------------------------------------------------------------------------------
--- NOVA FUNÇÃO: Verifica se o jogador tem acesso à água (VERSÃO FINAL E SEGURA)
+-- NOVA FUNÇÃO: Verifica se o jogador tem acesso à água (VERSÃO FINALÍSSIMA E SEGURA)
 ------------------------------------------------------------------------------------------
 function DentalCare.hasWaterSource(player)
-    -- 1. Verifica se há um item com água no inventário principal (esta parte já estava correta)
+    -- 1. Verifica se há um item com água no inventário principal (esta parte está 100% correta)
     local inventory = player:getInventory()
     for i = 0, inventory:getItems():size() - 1 do
         local item = inventory:getItems():get(i)
         if instanceof(item, "Drainable") and item:getThirstChange() < 0 then
-            return true -- Encontrou uma fonte de água no inventário
+            return true
         end
     end
 
-    -- 2. Se não encontrou no inventário, procura por uma pia/barril por perto (LÓGICA FINAL)
+    -- 2. Se não encontrou no inventário, procura por uma pia/barril por perto
     local currentSquare = player:getSquare()
-    if not currentSquare then return false end -- Checagem de segurança para o quadrado do jogador
+    if not currentSquare then return false end
 
     -- Função de ajuda para não repetir código
     local function checkSquareForWater(square)
@@ -40,7 +40,7 @@ function DentalCare.hasWaterSource(player)
         for i = 0, square:getObjects():size() - 1 do
             local obj = square:getObjects():get(i)
             if obj.getWaterAmount then
-                return true -- Encontrou um objeto com água!
+                return true
             end
         end
         return false
@@ -49,12 +49,13 @@ function DentalCare.hasWaterSource(player)
     -- Primeiro, checa o quadrado em que o jogador está pisando
     if checkSquareForWater(currentSquare) then return true end
 
-    -- Depois, checa todos os 8 quadrados vizinhos
-    for _, dir in ipairs(IsoDirections.values()) do
-        if dir ~= IsoDirections.Max then -- IsoDirections.Max não é uma direção real, então pulamos
-            local adjacentSquare = currentSquare:getAdjacentSquare(dir)
-            if checkSquareForWater(adjacentSquare) then return true end
-        end
+    -- DEPOIS, CHECA OS VIZINHOS USANDO UM LOOP FIXO E SEGURO
+    local directions = IsoDirections.values()
+    -- Nós sabemos que existem 8 direções válidas. O loop vai de 0 a 7.
+    for i = 0, 7 do
+        local dir = directions[i]
+        local adjacentSquare = currentSquare:getAdjacentSquare(dir)
+        if checkSquareForWater(adjacentSquare) then return true end
     end
 
     return false -- Nenhuma fonte de água encontrada no ambiente
