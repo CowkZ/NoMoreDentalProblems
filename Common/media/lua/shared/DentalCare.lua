@@ -18,47 +18,58 @@ function DentalCare.performBrushTeeth(player, toothpaste) -- Trocamos 'sinkObjec
 end
 
 ------------------------------------------------------------------------------------------
--- NOVA FUNÇÃO: Verifica se o jogador tem acesso à água (VERSÃO FINALÍSSIMA E SEGURA)
+-- FUNÇÃO DE DIAGNÓSTICO FINAL: VAMOS FAZER UM RAIO-X DOS OBJETOS
 ------------------------------------------------------------------------------------------
 function DentalCare.hasWaterSource(player)
-    -- 1. Verifica se há um item com água no inventário principal (esta parte está 100% correta)
+    print("--- INICIANDO DIAGNÓSTICO DE FONTE DE ÁGUA ---")
+
+    -- 1. Checagem de inventário (não vamos mexer aqui)
     local inventory = player:getInventory()
     for i = 0, inventory:getItems():size() - 1 do
         local item = inventory:getItems():get(i)
         if instanceof(item, "Drainable") and item:getThirstChange() < 0 then
+            print("DIAGNÓSTICO: Encontrada garrafa d'água no inventário.")
             return true
         end
     end
 
-    -- 2. Se não encontrou no inventário, procura por uma pia/barril por perto
+    -- 2. Raio-X do ambiente
     local currentSquare = player:getSquare()
-    if not currentSquare then return false end
-
-    -- Função de ajuda para não repetir código
-    local function checkSquareForWater(square)
-        if not square then return false end
-        for i = 0, square:getObjects():size() - 1 do
-            local obj = square:getObjects():get(i)
-            if obj.getWaterAmount then
-                return true
-            end
-        end
+    if not currentSquare then
+        print("DIAGNÓSTICO: Erro crítico, não foi possível pegar o quadrado do jogador.")
         return false
     end
 
-    -- Primeiro, checa o quadrado em que o jogador está pisando
-    if checkSquareForWater(currentSquare) then return true end
-
-    -- DEPOIS, CHECA OS VIZINHOS USANDO UM LOOP FIXO E SEGURO
-    local directions = IsoDirections.values()
-    -- Nós sabemos que existem 8 direções válidas. O loop vai de 0 a 7.
-    for i = 0, 7 do
-        local dir = directions[i]
-        local adjacentSquare = currentSquare:getAdjacentSquare(dir)
-        if checkSquareForWater(adjacentSquare) then return true end
+    -- Função de ajuda para inspecionar um quadrado
+    local function inspectSquare(square, label)
+        if not square then return end
+        print("--- Inspecionando Quadrado: '"..label.."' em "..square:getX()..","..square:getY().." ---")
+        if square:getObjects():size() == 0 then
+            print("Nenhum objeto encontrado neste quadrado.")
+        else
+            for i = 0, square:getObjects():size() - 1 do
+                local obj = square:getObjects():get(i)
+                print("--- Objeto #"..i.." Encontrado ---")
+                -- A linha mais importante: vamos despejar todas as informações do objeto
+                ISDebugger.dump(obj)
+            end
+        end
     end
 
-    return false -- Nenhuma fonte de água encontrada no ambiente
+    -- Inspeciona o quadrado atual
+    inspectSquare(currentSquare, "ATUAL")
+
+    -- Inspeciona os 8 vizinhos
+    local directionsList = {
+        IsoDirections.N, IsoDirections.NE, IsoDirections.E, IsoDirections.SE,
+        IsoDirections.S, IsoDirections.SW, IsoDirections.W, IsoDirections.NW
+    }
+    for _, dir in ipairs(directionsList) do
+        inspectSquare(currentSquare:getAdjacentSquare(dir), tostring(dir))
+    end
+
+    print("--- FIM DO DIAGNÓSTICO ---")
+    return false -- A função vai retornar false de propósito, apenas para gerar o log.
 end
 
 ------------------------------------------------------------------------------------------
@@ -81,7 +92,7 @@ function DentalCare.onFillInventoryContextMenu(player, context, items)
             -- Usamos 'playerObj' para garantir que não teremos erros de 'nil'.
             local hasToothbrush = playerObj:getInventory():contains("Base.Toothbrush")
             local hasWater = DentalCare.hasWaterSource(playerObj)
-
+            print(hasWater)
             if hasToothbrush and hasWater then
                 -- Adicionamos a opção usando o playerObj seguro.
                 context:addOption(getText("UI_NDP_BrushTeeth"), item, DentalCare.performBrushTeeth, playerObj, item)
