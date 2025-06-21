@@ -1,86 +1,123 @@
--- DentalCare.lua
+-- /shared/DentalCare.lua -- VERSÃO ADAPTADA PARA CLICAR NA PASTA DE DENTE
 
--- Criamos uma tabela para organizar nosso código e evitar conflitos com outros mods.
 DentalCare = {}
 
 ------------------------------------------------------------------------------------------
--- FUNÇÃO PRINCIPAL: O que acontece quando o jogador escova os dentes.
+-- Ação que acontece ao escovar os dentes
 ------------------------------------------------------------------------------------------
-function DentalCare.performBrushTeeth(player)
-    local toothpaste = player:getInventory():findAndReturn("Base.Toothpaste")
-    if not toothpaste then return end
-
+function DentalCare.performBrushTeeth(player, toothpaste) -- Trocamos 'sinkObject' por 'toothpaste'
+    -- Consome a pasta de dente que foi clicada
     toothpaste:setUsedDelta(toothpaste:getUsedDelta() + 0.1)
+
+    -- Lógica para consumir um pouco de água (seja da garrafa ou do ambiente)
+    -- (Podemos adicionar isso depois para mais realismo)
 
     player:getModData().dentalHygieneProgress = 0
     print("HIGIENE DENTAL: Dentes escovados! Progresso de 'sujeira' zerado.")
-
     player:getMoodles():getMoodle(MoodleType.Happy):setEffectiveValue(5, 30)
 end
 
 ------------------------------------------------------------------------------------------
--- LÓGICA DO MENU: Adiciona a opção "Escovar Dentes" ao clicar com o botão direito.
+-- NOVA FUNÇÃO: Verifica se o jogador tem acesso à água (VERSÃO FINAL E SEGURA)
 ------------------------------------------------------------------------------------------
-function DentalCare.onFillContextMenu(player, context, worldobjects)
-    local clickedWaterSource = false
-    for i, obj in ipairs(worldobjects) do
-        if obj:getSprite() and obj:getSprite():getName() and string.find(obj:getSprite():getName(), "faucet") then
-            clickedWaterSource = true
-            break
+function DentalCare.hasWaterSource(player)
+    -- 1. Verifica se há um item com água no inventário principal (esta parte já estava correta)
+    local inventory = player:getInventory()
+    for i = 0, inventory:getItems():size() - 1 do
+        local item = inventory:getItems():get(i)
+        if instanceof(item, "Drainable") and item:getThirstChange() < 0 then
+            return true -- Encontrou uma fonte de água no inventário
         end
     end
-    if not clickedWaterSource then return end
 
-    local hasToothbrush = player:getInventory():contains("Base.Toothbrush")
-    local hasToothpaste = player:getInventory():contains("Base.Toothpaste")
+    -- 2. Se não encontrou no inventário, procura por uma pia/barril por perto (LÓGICA FINAL)
+    local currentSquare = player:getSquare()
+    if not currentSquare then return false end -- Checagem de segurança para o quadrado do jogador
 
-    if hasToothbrush and hasToothpaste then
-        -- Usando a nossa chave de tradução aqui
-        context:addOption(getText("UI_NDP_BrushTeeth"), worldobjects, DentalCare.performBrushTeeth, player)
+    -- Função de ajuda para não repetir código
+    local function checkSquareForWater(square)
+        if not square then return false end
+        for i = 0, square:getObjects():size() - 1 do
+            local obj = square:getObjects():get(i)
+            if obj.getWaterAmount then
+                return true -- Encontrou um objeto com água!
+            end
+        end
+        return false
+    end
+
+    -- Primeiro, checa o quadrado em que o jogador está pisando
+    if checkSquareForWater(currentSquare) then return true end
+
+    -- Depois, checa todos os 8 quadrados vizinhos
+    for _, dir in ipairs(IsoDirections.values()) do
+        if dir ~= IsoDirections.Max then -- IsoDirections.Max não é uma direção real, então pulamos
+            local adjacentSquare = currentSquare:getAdjacentSquare(dir)
+            if checkSquareForWater(adjacentSquare) then return true end
+        end
+    end
+
+    return false -- Nenhuma fonte de água encontrada no ambiente
+end
+
+------------------------------------------------------------------------------------------
+-- LÓGICA DO MENU DE CONTEXTO (VERSÃO FINALÍSSIMA)
+------------------------------------------------------------------------------------------
+function DentalCare.onFillInventoryContextMenu(player, context, items)
+    -- PASSO 1: Pegamos o objeto do jogador de forma segura, ignorando o argumento 'player'.
+    local playerObj = getSpecificPlayer(0)
+    if not playerObj then return end -- Uma checagem de segurança.
+
+    -- PASSO 2: A SUA DESCOBERTA! Pegamos a lista de itens real usando a função correta.
+    local actualItems = ISInventoryPane.getActualItems(items, playerObj)
+    if not actualItems then return end
+
+    -- PASSO 3: O nosso loop, que agora vai funcionar com os itens reais.
+    for _, item in ipairs(actualItems) do
+        -- Checamos se o item é válido e se é uma pasta de dente.
+        if item and item:getFullType() == "Base.Toothpaste" then
+
+            -- Usamos 'playerObj' para garantir que não teremos erros de 'nil'.
+            local hasToothbrush = playerObj:getInventory():contains("Base.Toothbrush")
+            local hasWater = DentalCare.hasWaterSource(playerObj)
+
+            if hasToothbrush and hasWater then
+                -- Adicionamos a opção usando o playerObj seguro.
+                context:addOption(getText("UI_NDP_BrushTeeth"), item, DentalCare.performBrushTeeth, playerObj, item)
+                -- O 'break' impede que a opção seja adicionada várias vezes.
+                break
+            end
+        end
     end
 end
 
 ------------------------------------------------------------------------------------------
--- LÓGICA DO TIMER: Aumenta a "sujeira" e aplica os Moodle.
+-- Lógica do Timer de Higiene (sem alterações)
 ------------------------------------------------------------------------------------------
 DentalCare.ticksPorHora = 3600
 DentalCare.tickCounter = 0
 
 function DentalCare.updateTimer(player)
     DentalCare.tickCounter = DentalCare.tickCounter + 1
-
     if DentalCare.tickCounter < DentalCare.ticksPorHora then
         return
     end
-
     DentalCare.tickCounter = 0
-
     local hygieneProgress = player:getModData().dentalHygieneProgress or 0
     hygieneProgress = hygieneProgress + 1
     player:getModData().dentalHygieneProgress = hygieneProgress
-    
     print("HIGIENE DENTAL: Progresso atual = " .. hygieneProgress)
-    
-    -- Futura lógica dos moodles virá aqui
 end
 
-
--- =======================================================================================
--- FUNÇÃO DE INICIALIZAÇÃO (A CORREÇÃO ESTÁ AQUI)
--- =======================================================================================
--- Esta função só vai rodar quando o jogo estiver 100% carregado e pronto.
+------------------------------------------------------------------------------------------
+-- Inicialização dos Eventos (com o evento de inventário)
+------------------------------------------------------------------------------------------
 function DentalCare.onGameStart()
-    -- Nós movemos os registros de eventos para DENTRO desta função.
-    Events.onFillWorldObjectContextMenu.Add(DentalCare.onFillContextMenu)
+    -- MUDANÇA IMPORTANTE: Trocamos o evento para o de inventário.
+    Events.OnFillInventoryObjectContextMenu.Add(DentalCare.onFillInventoryContextMenu)
     Events.OnPlayerUpdate.Add(DentalCare.updateTimer)
     print("No More Dental Problems: Eventos registrados com sucesso.")
 end
 
-
-------------------------------------------------------------------------------------------
--- EVENTOS: "Ligamos" nossa função de inicialização no evento OnGameStart
-------------------------------------------------------------------------------------------
--- Este é o ÚNICO registro de evento que fica no corpo principal do arquivo.
 Events.OnGameStart.Add(DentalCare.onGameStart)
-
 print("Mod No More Dental Problems carregado. Aguardando início do jogo...")
