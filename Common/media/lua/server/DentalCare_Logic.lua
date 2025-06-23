@@ -1,85 +1,70 @@
--- DentalCare_Logic.lua (Atualizado com Moodles e Falas)
+-- DentalCare_Logic.lua (Versão Final com a sua correção de getPlayer())
 
 local TeethHygiene = {}
 TeethHygiene.modDataKey = "NoMoreDentalProblems.HygieneValue"
 TeethHygiene.defaultValue = 1.0
-TeethHygiene.decayRate = 0.2 -- Perde 20% de higiene por dia
+TeethHygiene.decayRate = 0.2
 
--- Inicializa o valor de higiene para um novo jogador
-function TeethHygiene.Init(player)
+function TeethHygiene.Init(playerIndex)
+    local player = getPlayer(playerIndex)
+    if not player then return end -- Checagem de segurança
     player:getModData()[TeethHygiene.modDataKey] = TeethHygiene.defaultValue
+    player:getModData().hygieneUnhappiness = 0
 end
 
--- Pega o valor atual de higiene
-function TeethHygiene.getValue(player)
-    return player:getModData()[TeethHygiene.modDataKey] or TeethHygiene.defaultValue
-end
+function TeethHygiene.processEffects(player)
+    local hygieneValue = player:getModData()[TeethHygiene.modDataKey] or TeethHygiene.defaultValue
+    local stats = player:getStats()
+    if not stats then return end
 
--- Define um novo valor de higiene
-function TeethHygiene.setValue(player, value)
-    local clampedValue = math.max(0, math.min(1.0, value))
-    player:getModData()[TeethHygiene.modDataKey] = clampedValue
-end
+    local currentUnhappiness = stats:getUnhappiness()
+    local unhappinessFromHygiene = player:getModData().hygieneUnhappiness or 0
+    local baseUnhappiness = currentUnhappiness - unhappinessFromHygiene
+    local newPain = 0
+    local newUnhappinessFromHygiene = 0
 
--- NOVA FUNÇÃO: Controla os efeitos (moodles e falas)
-function TeethHygiene.processEffects(player, hygieneValue)
-    local moodles = player:getMoodles()
-    local complaintCooldown = 12 -- Personagem só reclama a cada 12 horas
-    local lastComplaint = player:getModData().lastDentalComplaintTime or -complaintCooldown
-
-    -- Estágio 2: Negligência Severa -> Dor
     if hygieneValue <= 0.3 then
-        moodles:setMoodleLevel(MoodleType.Pain, 1) -- Nível 1 de Dor
-        moodles:setMoodleLevel(MoodleType.Discomfort, 0) -- Dor substitui o desconforto
-        -- Se já passou tempo suficiente desde a última reclamação...
-        if getGameTime():getWorldAgeHours() > lastComplaint + complaintCooldown then
-            player:Say(getText("UI_NDP_Say_Stage2")) -- ...faz o personagem falar.
-            player:getModData().lastDentalComplaintTime = getGameTime():getWorldAgeHours()
-        end
-    -- Estágio 1: Negligência Leve -> Desconforto
+        newPain = 25
+        newUnhappinessFromHygiene = 10
     elseif hygieneValue <= 0.7 then
-        moodles:setMoodleLevel(MoodleType.Pain, 0)
-        moodles:setMoodleLevel(MoodleType.Discomfort, 1) -- Nível 1 de Desconforto
-        if getGameTime():getWorldAgeHours() > lastComplaint + complaintCooldown then
-            player:Say(getText("UI_NDP_Say_Stage1"))
-            player:getModData().lastDentalComplaintTime = getGameTime():getWorldAgeHours()
-        end
-    -- Sem Negligência
-    else
-        moodles:setMoodleLevel(MoodleType.Pain, 0)
-        moodles:setMoodleLevel(MoodleType.Discomfort, 0)
+        newPain = 0
+        newUnhappinessFromHygiene = 15
     end
+
+    stats:setPain(newPain)
+    stats:setUnhappiness(baseUnhappiness + newUnhappinessFromHygiene)
+    player:getModData().hygieneUnhappiness = newUnhappinessFromHygiene
 end
 
--- Função principal que roda a cada hora
-function TeethHygiene.update(player)
-    local currentValue = TeethHygiene.getValue(player)
+function TeethHygiene.update(playerIndex)
+    local player = getPlayer(playerIndex)
+    if not player then return end
+
+    local currentValue = player:getModData()[TeethHygiene.modDataKey] or TeethHygiene.defaultValue
     local hourlyDecay = TeethHygiene.decayRate / 24
     local newValue = currentValue - hourlyDecay
-    TeethHygiene.setValue(player, newValue)
-    -- Após atualizar o valor, processamos os efeitos
-    TeethHygiene.processEffects(player, newValue)
+    player:getModData()[TeethHygiene.modDataKey] = newValue
+    TeethHygiene.processEffects(player)
 end
 
--- Função global para resetar a higiene (chamada pela ação de escovar)
 _G.ResetPlayerHygiene = function(player)
-    TeethHygiene.setValue(player, 1.0)
-    -- Remove imediatamente os moodles ao escovar
-    player:getMoodles():setMoodleLevel(MoodleType.Pain, 0)
-    player:getMoodles():setMoodleLevel(MoodleType.Discomfort, 0)
-    print("HIGIENE DENTAL: Nível de higiene resetado!")
+    player:getModData()[TeethHygiene.modDataKey] = 1.0
+    local stats = player:getStats()
+    if stats then
+        stats:setPain(0)
+        local unhappinessFromHygiene = player:getModData().hygieneUnhappiness or 0
+        stats:setUnhappiness(stats:getUnhappiness() - unhappinessFromHygiene)
+    end
+    player:getModData().hygieneUnhappiness = 0
 end
 
--- Conecta os eventos do jogo às nossas funções (sem alterações aqui)
-Events.OnCreatePlayer.Add(function(playerNum, player)
-    TeethHygiene.Init(player)
+-- Eventos corrigidos para passar o ÍNDICE do jogador, não o objeto
+Events.OnCreatePlayer.Add(function(playerIndex, player)
+    TeethHygiene.Init(playerIndex)
 end)
 
 Events.EveryHours.Add(function()
     for i = 0, getNumActivePlayers() - 1 do
-        local player = getPlayer(i)
-        if player then
-            TeethHygiene.update(player)
-        end
+        TeethHygiene.update(i)
     end
 end)
