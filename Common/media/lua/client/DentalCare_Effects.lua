@@ -1,4 +1,5 @@
 -- DentalCare_Effects.lua (Versão Final - Lendo ModData)
+require "DentalCare_Logic"
 
 local function processEffects(player)
     -- A CORREÇÃO ESTÁ AQUI: Lemos o valor diretamente do ModData.
