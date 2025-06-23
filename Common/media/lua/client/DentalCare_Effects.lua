@@ -1,35 +1,47 @@
 -- DentalCare_Effects.lua (Versão Final - Lendo ModData)
 require "DentalCare_Logic"
 
+-- DentalCare_Effects.lua (Versão Final com a Lógica de Status Corrigida)
+
 local function processEffects(player)
-    -- A CORREÇÃO ESTÁ AQUI: Lemos o valor diretamente do ModData.
+    -- Lemos o valor de higiene que o servidor calculou e sincronizou via ModData.
+    print("processEffect foi")
     local hygieneValue = player:getModData()["NoMoreDentalProblems.HygieneValue"] or 1.0
-
+    
+    -- Pegamos os dois objetos de status para usar cada um para sua finalidade.
     local stats = player:getStats()
-    if not stats then return end
+    local bodyDamage = player:getBodyDamage()
+    if not stats or not bodyDamage then return end
 
-    local currentUnhappiness = stats:getUnhappiness()
-    local unhappinessFromHygiene = player:getModData().hygieneUnhappiness or 0
-    local baseUnhappiness = currentUnhappiness - unhappinessFromHygiene
+    -- Lógica segura para não interferir com outras fontes de dor ou infelicidade:
+    -- Primeiro, removemos os valores que nosso mod adicionou na última vez.
+    stats:setPain(stats:getPain() - (player:getModData().hygienePain or 0))
+    bodyDamage:setUnhappynessLevel(bodyDamage:getUnhappynessLevel() - (player:getModData().hygieneUnhappiness or 0))
 
     local newPain = 0
-    local newUnhappinessFromHygiene = 0
+    local newUnhappiness = 0
     local speechKey = nil
 
+    -- Estágio 2: Negligência Severa -> Dor
     if hygieneValue <= 0.3 then
-        newPain = 25
-        newUnhappinessFromHygiene = 10
-        speechKey = "UI_NDP_Say_Stage2"
+        newPain = 20 -- Adiciona Dor via Stats
+    -- Estágio 1: Negligência Leve -> Desconforto
     elseif hygieneValue <= 0.7 then
-        newPain = 0
-        newUnhappinessFromHygiene = 15
-        speechKey = "UI_NDP_Say_Stage1"
+        newUnhappiness = 15 -- Adiciona Infelicidade (Desconforto) via BodyDamage
     end
-
-    stats:setPain(newPain)
-    stats:setUnhappiness(baseUnhappiness + newUnhappinessFromHygiene)
-    player:getModData().hygieneUnhappiness = newUnhappinessFromHygiene
     
+    -- Agora, aplicamos os novos valores. Se a higiene for boa, os valores serão 0.
+    stats:setPain(stats:getPain() + newPain)
+    bodyDamage:setUnhappynessLevel(bodyDamage:getUnhappynessLevel() + newUnhappiness)
+
+    -- Guardamos quanto nós adicionamos para podermos remover da próxima vez.
+    player:getModData().hygienePain = newPain
+    player:getModData().hygieneUnhappiness = newUnhappiness
+    
+    -- Lógica das falas (só acontece se houver algum efeito negativo)
+    if newPain > 0 then speechKey = "UI_NDP_Say_Stage2" end
+    if newUnhappiness > 0 then speechKey = "UI_NDP_Say_Stage1" end
+
     if speechKey then
         local complaintCooldown = 12
         local lastComplaint = player:getModData().lastDentalComplaintTime or -complaintCooldown
@@ -40,7 +52,7 @@ local function processEffects(player)
     end
 end
 
--- Usando o evento seguro EveryTenMinutes
+-- Usamos um evento estável para rodar a lógica de efeitos.
 Events.EveryTenMinutes.Add(function()
     local player = getPlayer()
     if player and player:isLocalPlayer() then
@@ -48,19 +60,20 @@ Events.EveryTenMinutes.Add(function()
     end
 end)
 
--- Sobrescrevemos a função de reset para limpar os status no client
+-- A função de reset agora também zera os status no client
 local original_ResetPlayerHygiene = _G.ResetPlayerHygiene
 _G.ResetPlayerHygiene = function(player)
     if original_ResetPlayerHygiene then original_ResetPlayerHygiene(player) end
 
     if player and player:isLocalPlayer() then
         local stats = player:getStats()
-        if stats then
-            stats:setPain(0)
-            local unhappinessFromHygiene = player:getModData().hygieneUnhappiness or 0
-            stats:setUnhappiness(stats:getUnhappiness() - unhappinessFromHygiene)
+        local bodyDamage = player:getBodyDamage()
+        print("resetando player ihigiene")
+        if stats and bodyDamage then
+            stats:setPain(stats:getPain() - (player:getModData().hygienePain or 0))
+            bodyDamage:setUnhappynessLevel(bodyDamage:getUnhappynessLevel() - (player:getModData().hygieneUnhappiness or 0))
         end
+        player:getModData().hygienePain = 0
         player:getModData().hygieneUnhappiness = 0
-        print("HIGIENE DENTAL: Nível de higiene resetado e status restaurados!")
     end
 end

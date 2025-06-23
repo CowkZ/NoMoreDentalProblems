@@ -1,0 +1,36 @@
+module Base
+{
+    imports {Base}
+
+    item Toothpaste
+    {
+        DisplayName = Toothpaste,
+		DisplayCategory = Toiletries,
+		Type = Drainable,
+        UseDelta = 0.1,
+        UseWhileEquipped = FALSE
+		Weight = 0.3,
+		Icon = Toothpaste,
+		WorldStaticModel = Toothpaste,
+    }
+
+    item ToothpasteEmpty
+    {
+        DisplayName = Empty Toothpaste,
+        Type = Normal,
+        DisplayCategory = Toiletries,
+        Weight = 0.1,
+        Icon = Toothbrush,
+        Tooltip = Tooltip_toothbrush,
+    }
+
+    item Toothbrush
+    {
+        DisplayName = Toothbrush,
+        Type = Normal,
+        DisplayCategory = Toiletries,
+        Weight = 0.1,
+        Icon = Toothbrush,
+        Tooltip = Tooltip_toothbrush,
+    }
+}

@@ -1,45 +1,53 @@
--- DentalCare_Logic.lua (Versão Final com a sua correção de getPlayer())
+-- DentalCare_Logic.lua (Versão Final com a Lógica de Status Corrigida)
 
 local TeethHygiene = {}
 TeethHygiene.modDataKey = "NoMoreDentalProblems.HygieneValue"
 TeethHygiene.defaultValue = 1.0
 TeethHygiene.decayRate = 0.2
 
-function TeethHygiene.Init(playerIndex)
-    local player = getPlayer(playerIndex)
-    if not player then return end -- Checagem de segurança
+function TeethHygiene.Init(player)
+    if not player then return end
     player:getModData()[TeethHygiene.modDataKey] = TeethHygiene.defaultValue
     player:getModData().hygieneUnhappiness = 0
 end
 
 function TeethHygiene.processEffects(player)
-    local hygieneValue = player:getModData()[TeethHygiene.modDataKey] or TeethHygiene.defaultValue
-    local stats = player:getStats()
-    if not stats then return end
 
-    local currentUnhappiness = stats:getUnhappiness()
+    local hygieneValue = player:getModData()[TeethHygiene.modDataKey] or TeethHygiene.defaultValue
+    
+    -- Pegamos os DOIS objetos de status, para usar cada um para sua finalidade correta.
+    local stats = player:getStats()
+    local bodyDamage = player:getBodyDamage()
+    if not stats or not bodyDamage then return end
+
+    -- Lógica para Infelicidade (usando BodyDamage, como você apontou)
+    local currentUnhappiness = bodyDamage:getUnhappynessLevel() or 0
     local unhappinessFromHygiene = player:getModData().hygieneUnhappiness or 0
     local baseUnhappiness = currentUnhappiness - unhappinessFromHygiene
+
     local newPain = 0
     local newUnhappinessFromHygiene = 0
 
+    -- Estágio 2: Negligência Severa -> Dor
     if hygieneValue <= 0.3 then
         newPain = 25
         newUnhappinessFromHygiene = 10
+    -- Estágio 1: Negligência Leve -> Desconforto (via Infelicidade)
     elseif hygieneValue <= 0.7 then
         newPain = 0
         newUnhappinessFromHygiene = 15
     end
 
-    stats:setPain(newPain)
-    stats:setUnhappiness(baseUnhappiness + newUnhappinessFromHygiene)
+    -- Aplicamos os valores aos objetos corretos
+    stats:setPain(newPain) -- Dor é controlada pelo Stats
+    bodyDamage:setUnhappynessLevel(baseUnhappiness + newUnhappinessFromHygiene) -- Infelicidade pelo BodyDamage
+
+    -- Guardamos quanta infelicidade o NOSSO MOD adicionou
     player:getModData().hygieneUnhappiness = newUnhappinessFromHygiene
 end
 
-function TeethHygiene.update(playerIndex)
-    local player = getPlayer(playerIndex)
+function TeethHygiene.update(player)
     if not player then return end
-
     local currentValue = player:getModData()[TeethHygiene.modDataKey] or TeethHygiene.defaultValue
     local hourlyDecay = TeethHygiene.decayRate / 24
     local newValue = currentValue - hourlyDecay
@@ -48,23 +56,30 @@ function TeethHygiene.update(playerIndex)
 end
 
 _G.ResetPlayerHygiene = function(player)
+    if not player then return end
     player:getModData()[TeethHygiene.modDataKey] = 1.0
+    
     local stats = player:getStats()
-    if stats then
+    local bodyDamage = player:getBodyDamage()
+
+    if stats and bodyDamage then
         stats:setPain(0)
         local unhappinessFromHygiene = player:getModData().hygieneUnhappiness or 0
-        stats:setUnhappiness(stats:getUnhappiness() - unhappinessFromHygiene)
+        local currentUnhappiness = bodyDamage:getUnhappynessLevel() or 0
+        bodyDamage:setUnhappynessLevel(currentUnhappiness - unhappinessFromHygiene)
     end
     player:getModData().hygieneUnhappiness = 0
 end
 
--- Eventos corrigidos para passar o ÍNDICE do jogador, não o objeto
 Events.OnCreatePlayer.Add(function(playerIndex, player)
-    TeethHygiene.Init(playerIndex)
+    TeethHygiene.Init(player)
 end)
 
 Events.EveryHours.Add(function()
     for i = 0, getNumActivePlayers() - 1 do
-        TeethHygiene.update(i)
+        local player = getPlayer(i)
+        if player then
+            TeethHygiene.update(player)
+        end
     end
 end)
