@@ -3,7 +3,7 @@
 local TeethHygiene = {}
 TeethHygiene.modDataKey = "NoMoreDentalProblems.HygieneValue"
 TeethHygiene.defaultValue = 1.0
-TeethHygiene.decayRate = 0.2
+TeethHygiene.decayRate = 0.1
 
 function TeethHygiene.Init(player)
     if not player then return end
@@ -30,8 +30,8 @@ function TeethHygiene.processEffects(player)
 
     -- Estágio 2: Negligência Severa -> Dor
     if hygieneValue <= 0.3 then
-        newPain = 25
-        newUnhappinessFromHygiene = 10
+        newPain = 15
+        newUnhappinessFromHygiene = 15
     -- Estágio 1: Negligência Leve -> Desconforto (via Infelicidade)
     elseif hygieneValue <= 0.7 then
         newPain = 0
@@ -48,6 +48,7 @@ end
 
 function TeethHygiene.update(player)
     if not player then return end
+    print("logica funcionando")
     local currentValue = player:getModData()[TeethHygiene.modDataKey] or TeethHygiene.defaultValue
     local hourlyDecay = TeethHygiene.decayRate / 24
     local newValue = currentValue - hourlyDecay
@@ -72,6 +73,7 @@ _G.ResetPlayerHygiene = function(player)
 end
 
 Events.OnCreatePlayer.Add(function(playerIndex, player)
+    print("player iniciado")
     TeethHygiene.Init(player)
 end)
 
