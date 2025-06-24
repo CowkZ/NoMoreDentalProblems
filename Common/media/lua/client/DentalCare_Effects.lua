@@ -5,7 +5,6 @@ require "DentalCare_Logic"
 
 local function processEffects(player)
     -- Lemos o valor de higiene que o servidor calculou e sincronizou via ModData.
-    print("processEffect foi")
     local hygieneValue = player:getModData()["NoMoreDentalProblems.HygieneValue"] or 1.0
     
     -- Pegamos os dois objetos de status para usar cada um para sua finalidade.
@@ -42,11 +41,11 @@ local function processEffects(player)
     if newPain > 0 then speechKey = "UI_NDP_Say_Stage2" end
     if newUnhappiness > 0 then speechKey = "UI_NDP_Say_Stage1" end
 
-    if speechKey then
+    if speechKey and not nil then -- trava de seguranca para nao vir valores nulos
         local complaintCooldown = 12
         local lastComplaint = player:getModData().lastDentalComplaintTime or -complaintCooldown
         if getGameTime():getWorldAgeHours() > lastComplaint + complaintCooldown then
-            player:Say(getText(speechKey))
+            --player:Say(getText(speechKey)) isso nao funciona pois so vai ser ativado quando apertado a tecla do jogo
             player:getModData().lastDentalComplaintTime = getGameTime():getWorldAgeHours()
         end
     end
