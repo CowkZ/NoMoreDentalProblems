@@ -1,0 +1,5 @@
+ContextMenu_EN = {
+	UI_NDP_BrushTeeth = "Brush Teeth",
+	UI_NDP_Say_Stage1 = "I think I need to brush my teeth...",
+	UI_NDP_Say_Stage2 = "I WOULD REALLY LIKE TO BRUSH MY TEETH!",
+}

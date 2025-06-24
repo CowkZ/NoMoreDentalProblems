@@ -1,20 +1,28 @@
--- ISBrushTeethAction.lua
+-- ISBrushTeethAction.lua (Usando o construtor :new() correto e funcional)
 
 require "TimedActions/ISBaseTimedAction"
 
 ISBrushTeethAction = ISBaseTimedAction:derive("ISBrushTeethAction")
 
 function ISBrushTeethAction:isValid()
-    -- Checa se o jogador ainda tem os itens
-    if not self.toothbrush or self.toothbrush:isBroken() then return false end
-    if not self.toothpaste or self.toothpaste:getUsedDelta() <= 0 then return false end
+    -- Checa se o jogador ainda tem os itens e se eles são utilizáveis
+    if not self.character:getInventory():contains(self.toothbrush) or self.toothbrush:isBroken() then return false end
+    if not self.character:getInventory():contains(self.toothpaste) then return false end
+    if instanceof(self.toothpaste, "Drainable") and self.toothpaste:getCurrentUsesFloat() <= 0 then return false end
     return true
 end
 
+function ISBrushTeethAction:waitToStart()
+	return false -- Ação começa imediatamente
+end
+
+function ISBrushTeethAction:update()
+end
+
 function ISBrushTeethAction:start()
-    self:setActionAnim("WashFace") -- Animação de lavar o rosto, uma boa aproximação
+    self:setActionAnim("WashFace")
     self.sound = self.character:playSound("PZ_WashHands")
-    self:setOverrideHandModels(self.toothbrush, nil) -- Mostra a escova na mão
+    self:setOverrideHandModels(self.toothbrush, nil)
 end
 
 function ISBrushTeethAction:stop()
@@ -25,21 +33,13 @@ function ISBrushTeethAction:stop()
 end
 
 function ISBrushTeethAction:perform()
-    -- Consome a pasta de dente
     self.toothpaste:Use()
-
-    -- Desgasta a escova de dentes
-    self.toothbrush:setCondition(self.toothbrush:getCondition() - 1)
-
-    -- Reseta a higiene do jogador (chamando a função do arquivo de lógica)
+    self.toothbrush:setCondition(self.toothbrush:getCondition() - 0.5)
     ResetPlayerHygiene(self.character)
-    
-    -- Bônus de felicidade
-    self.character:getMoodles():getMoodle(MoodleType.Happy):setEffectiveValue(5, 30)
-    
     ISBaseTimedAction.perform(self)
 end
 
+-- A CORREÇÃO FINAL ESTÁ AQUI: Usando o método de construção que funciona.
 function ISBrushTeethAction:new(character, toothbrush, toothpaste)
     local o = {}
     setmetatable(o, self)
@@ -47,6 +47,8 @@ function ISBrushTeethAction:new(character, toothbrush, toothpaste)
     o.character = character
     o.toothbrush = toothbrush
     o.toothpaste = toothpaste
-    o.maxTime = 90 -- Duração da ação
+    o.maxTime = 90
+    o.stopOnWalk = true
+    o.stopOnRun = true
     return o
 end
