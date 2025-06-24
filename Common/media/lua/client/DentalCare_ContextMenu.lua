@@ -22,7 +22,7 @@ end
 local function OnBrushTeeth(toothbrush)
     local playerObj = getSpecificPlayer(0)
     if not playerObj then return end
-
+      print("funcionou context menu")
     -- Verificamos novamente se temos a pasta de dente, por segurança
     local toothpaste = findToothpaste(playerObj)
     if not toothpaste then return end
